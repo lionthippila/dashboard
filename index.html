@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard รายรับรายจ่าย</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 1.5rem;
+      padding-top: 4rem; /* เว้นพื้นที่บนสำหรับ toggle button */
+      color: #222;
+      transition: margin-left 0.3s ease; /* เวลาซ่อนไว้/แสดง sidebar จะได้เลื่อนได้ */
+    }
+
+    h1 {
+      font-weight: 600;
+      font-size: 1.8rem;
+      margin-bottom: 1.8rem;
+      text-align: center;
+      color: #1a1a1a;
+    }
+
+    .cards {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+
+    .card {
+      flex: 1;
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      font-weight: 800;
+      font-size: 2.5rem;
+      cursor: default;
+      transition: box-shadow 0.3s ease, transform 0.2s ease;
+    }
+
+    .card.income {
+      background: #e8f5e9;
+      color: #2e7d32;
+      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+    }
+
+    .card.income:hover {
+      box-shadow: 0 8px 24px rgba(76, 175, 80, 0.5);
+      transform: translateY(-4px);
+    }
+
+    .card.expense {
+      background: #ffebee;
+      color: #c62828;
+      box-shadow: 0 4px 12px rgba(244, 67, 54, 0.3);
+    }
+
+    .card.expense:hover {
+      box-shadow: 0 8px 24px rgba(244, 67, 54, 0.5);
+      transform: translateY(-4px);
+    }
+
+    .card.balance {
+      background: #fff3e0;
+      color: #ef6c00;
+      box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+    }
+
+    .card.balance:hover {
+      box-shadow: 0 8px 24px rgba(255, 152, 0, 0.5);
+      transform: translateY(-4px);
+    }
+
+    .card-title {
+      font-weight: 700;
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-value {
+      font-weight: 800;
+      font-size: 2.5rem;
+    }
+
+    #chartContainer {
+      background: white;
+      border-radius: 16px;
+      padding: 1rem;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.07), 0 6px 18px rgb(0 0 0 / 0.1);
+      margin-bottom: 2rem;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #chart {
+      display: block;
+      margin: 0 auto;
+      max-height: 500px;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    .recent-transactions {
+      background: white;
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.07), 0 6px 18px rgb(0 0 0 / 0.1);
+      margin-bottom: 1rem;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .recent-transactions h2 {
+      font-weight: 600;
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: #1a1a1a;
+    }
+
+    .transaction {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid #eee;
+      font-size: 0.9rem;
+    }
+
+    .transaction:last-child {
+      border-bottom: none;
+    }
+
+    .transaction .desc {
+      color: #555;
+    }
+
+    .transaction .amount {
+      font-weight: 600;
+    }
+
+    .transaction.income .amount {
+      color: #4caf50;
+    }
+
+    .transaction.expense .amount {
+      color: #f44336;
+    }
+
+    .transaction .date {
+      color: #999;
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+    }
+
+    #latestDateContainer {
+      background: white;
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.07), 0 6px 18px rgb(0 0 0 / 0.1);
+      font-size: 1rem;
+      color: #333;
+      text-align: center;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* Sidebar */
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: -220px; /* ซ่อนไว้ */
+      width: 200px;
+      height: 100%;
+      background: #fff;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+      padding: 1rem;
+      transition: left 0.3s ease;
+      z-index: 999;
+    }
+
+    #sidebar.active {
+      left: 0;
+    }
+
+    #sidebar .logo {
+      font-weight: bold;
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      color: #4caf50;
+    }
+
+    #sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    #sidebar ul li {
+      margin: 1rem 0;
+    }
+
+    #sidebar ul li a {
+      color: #333;
+      text-decoration: none;
+      font-weight: 500;
+      display: block;
+      padding: 0.3rem 0;
+      transition: color 0.3s ease;
+    }
+
+    #sidebar ul li a:hover {
+      color: #4caf50;
+    }
+
+    #sidebarToggle {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 1000;
+      background: #fff;
+      border-radius: 8px;
+      padding: 0.4rem 0.6rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      user-select: none;
+    }
+
+    @media (min-width: 768px) {
+      #sidebar {
+        left: 0;
+      }
+
+      #sidebarToggle {
+        display: none;
+      }
+
+      body {
+        margin-left: 220px; /* เว้นที่ให้ sidebar */
+        padding-top: 1.5rem; /* ลด padding-top เพราะไม่มี toggle */
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Responsive Sidebar -->
+  <nav id="sidebar">
+    <div class="logo">📊 DASHBOARD</div>
+    <ul>
+      <li><a href="#">🏠 หน้าหลัก</a></li>
+      <li><a href="#chartContainer">📈 สัดส่วน</a></li>
+      <li><a href="#transactionsList">📋 รายการ</a></li>
+      <li><a href="#latestDateContainer">📅 ล่าสุด</a></li>
+    </ul>
+  </nav>
+
+  <div id="sidebarToggle">&#9776;</div>
+
+  <!-- Dashboard Content -->
+  <h1>สรุปรายรับรายจ่าย</h1>
+
+  <div class="cards">
+    <div class="card income">
+      <div class="card-title">💰 รายรับ</div>
+      <div class="card-value" id="income">-</div>
+    </div>
+    <div class="card expense">
+      <div class="card-title">🛒 รายจ่าย</div>
+      <div class="card-value" id="expense">-</div>
+    </div>
+    <div class="card balance">
+      <div class="card-title">💵 คงเหลือ</div>
+      <div class="card-value" id="balance">-</div>
+    </div>
+  </div>
+
+  <div id="chartContainer">
+    <canvas id="chart" height="250"></canvas>
+  </div>
+
+  <div class="recent-transactions">
+    <h2>รายการล่าสุด</h2>
+    <div id="transactionsList">
+      <p style="text-align:center; color:#999;">กำลังโหลด...</p>
+    </div>
+  </div>
+
+  <div id="latestDateContainer">
+    วันที่รายการล่าสุด: <span id="latestDate">กำลังโหลด...</span>
+  </div>
+
+<!-- Scripts -->
+<script>
+const sidebar = document.getElementById("sidebar");
+const sidebarToggle = document.getElementById("sidebarToggle");
+
+sidebarToggle.addEventListener("click", () => {
+  sidebar.classList.toggle("active");
+
+  // เวลาซ่อนไว้/แสดง sidebar ให้เลื่อนเนื้อหา body ด้วย (บนมือถือ)
+  if (sidebar.classList.contains("active")) {
+    document.body.style.marginLeft = "200px";
+  } else {
+    document.body.style.marginLeft = "0";
+  }
+});
+
+// ปิด sidebar อัตโนมัติเมื่อคลิกเมนูบนมือถือ
+sidebar.querySelectorAll("a").forEach(link => {
+  link.addEventListener("click", () => {
+    if (window.innerWidth < 768) {
+      sidebar.classList.remove("active");
+      document.body.style.marginLeft = "0";
+    }
+  });
+});
+  const sheetId = "1x_2PqzNi6CRgeNF782NIhGTMpE20cggQ94NFyHzT6iw";
+  const gid = "2069202900";
+  const userIdFilter = "U12353dbe97cd07d05e07c6561f887299";
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=${gid}`;
+
+  function formatDate(dateString) {
+    if (!dateString) return "";
+    const dateObjMatch = dateString.match(/^Date\((\d+),(\d+),(\d+),?/);
+    if (dateObjMatch) {
+      const y = +dateObjMatch[1], m = +dateObjMatch[2], d = +dateObjMatch[3];
+      return new Date(y, m, d).toLocaleDateString('th-TH');
+    }
+    try {
+      const d = new Date(dateString);
+      return !isNaN(d) ? d.toLocaleDateString('th-TH') : dateString;
+    } catch { return dateString; }
+  }
+
+  async function fetchData() {
+    const res = await fetch(sheetUrl);
+    const raw = await res.text();
+    const json = JSON.parse(raw.substring(47).slice(0, -2));
+    return json.table.rows;
+  }
+
+  (async () => {
+    const rows = await fetchData();
+
+    let income = 0, expense = 0;
+    const transactions = [];
+
+    rows.forEach(row => {
+      const userId = row.c[0]?.v || "";
+      const date = row.c[1]?.v || "";
+      const type = row.c[2]?.v || "";
+      const amount = parseFloat(row.c[3]?.v || 0);
+      const desc = row.c[4]?.v || type;
+
+      if (userId !== userIdFilter || !date || !type || isNaN(amount)) return;
+
+      if (type === "รายรับ") income += amount;
+      else expense += amount;
+
+      transactions.push({ date, type, amount, desc });
+    });
+
+    document.getElementById("income").innerText = income.toLocaleString('th-TH');
+    document.getElementById("expense").innerText = expense.toLocaleString('th-TH');
+    document.getElementById("balance").innerText = (income - expense).toLocaleString('th-TH');
+
+    const recentList = document.getElementById("transactionsList");
+    recentList.innerHTML = "";
+
+    const lastFive = transactions.slice(-5).reverse();
+    lastFive.forEach(t => {
+      const div = document.createElement("div");
+      div.className = `transaction ${t.type === "รายรับ" ? "income" : "expense"}`;
+      div.innerHTML = `
+        <div class="desc">${t.desc}</div>
+        <div>
+          <span class="amount">${t.amount.toLocaleString('th-TH')} บาท</span>
+          <span class="date">${formatDate(t.date)}</span>
+        </div>`;
+      recentList.appendChild(div);
+    });
+
+    if (transactions.length > 0) {
+      const latestDate = transactions[transactions.length - 1].date;
+      document.getElementById("latestDate").innerText = formatDate(latestDate);
+    }
+
+    new Chart(document.getElementById("chart"), {
+      type: 'pie',
+      data: {
+        labels: ['รายรับ', 'รายจ่าย'],
+        datasets: [{
+          data: [income, expense],
+          backgroundColor: ['#4caf50', '#f44336']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 14 } } },
+          title: {
+            display: true,
+            text: 'สัดส่วนรายรับและรายจ่าย',
+            font: { size: 18 }
+          }
+        }
+      }
+    });
+  })();
+
+  document.getElementById("sidebarToggle").addEventListener("click", () => {
+    document.getElementById("sidebar").classList.toggle("active");
+  });
+</script>
+
+</body>
+</html>
