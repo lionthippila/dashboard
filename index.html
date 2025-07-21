@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard รายรับรายจ่าย</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Prompt', sans-serif;
+      background: radial-gradient(circle at top, #270101, #000000);
+      color: #fff;
+      min-height: 100vh;
+    }
+    header {
+      background: #6b0000;
+      color: #fff;
+      padding: 1.2rem 0 1rem 0;
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: bold;
+      border-radius: 0 0 16px 16px;
+      box-shadow: 0 2px 8px rgba(179,18,23,0.12);
+      letter-spacing: 1px;
+    }
+    .container {
+      padding: 1rem;
+      max-width: 430px;
+      margin: 2rem auto;
+    }
+    .summary {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7rem;
+      margin-bottom: 1.2rem;
+    }
+    .summary-box {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      box-shadow: 0 2px 8px rgba(179,18,23,0.07);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 1.1rem;
+      color: #b31217;
+      font-weight: 700;
+      transition: box-shadow 0.2s;
+    }
+    .summary-box:hover {
+      box-shadow: 0 4px 16px rgba(179,18,23,0.13);
+    }
+    .summary-box span:first-child {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #b31217;
+    }
+    #totalIncome { color: #27ae60; font-weight: bold; }
+    #totalExpense { color: #e74c3c; font-weight: bold; }
+    #balance { color: #b31217; font-weight: bold; }
+    .chart-container {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.2rem 0.7rem 1.2rem 0.7rem;
+      box-shadow: 0 2px 8px rgba(179,18,23,0.07);
+      margin-bottom: 1.5rem;
+    }
+    h3 {
+      margin-top: 0;
+      margin-bottom: 0.7rem;
+      font-size: 1.15rem;
+      color: #b31217;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+    .styled-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 1rem;
+      background: transparent;
+    }
+    .styled-table th, .styled-table td {
+      padding: 8px 10px;
+      border: none;
+      text-align: left;
+      font-size: 1rem;
+    }
+    .styled-table thead tr {
+      background-color: #b31217;
+      color: #fff;
+    }
+    .styled-table tbody tr:nth-child(even) {
+      background-color: #f8d7da;
+      color: #b31217;
+    }
+    .styled-table tbody tr:nth-child(odd) {
+      background-color: #fff;
+      color: #b31217;
+    }
+    .styled-table tbody tr:hover {
+      background-color: #b31217;
+      color: #fff;
+      transition: background 0.2s;
+    }
+    .styled-table .income {
+      color: #27ae60;
+      font-weight: bold;
+    }
+    .styled-table .expense {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    canvas {
+      width: 100% !important;
+      height: auto !important;
+      margin-bottom: 0.5rem;
+    }
+    #lastUpdated {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #f8d7da;
+      margin-top: -1rem;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 480px) {
+      header {
+        font-size: 1.2rem;
+        border-radius: 0 0 8px 8px;
+      }
+      .container {
+        padding: 0.5rem;
+        max-width: 98vw;
+      }
+      .summary-box {
+        font-size: 1rem;
+        padding: 0.7rem 0.7rem;
+      }
+      .chart-container {
+        padding: 0.7rem 0.3rem;
+      }
+      h3 {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>💸 Dashboard รายรับรายจ่าย</header>
+  <div class="container">
+    <div class="summary">
+      <div class="summary-box">
+        <span>รายรับ</span><span id="totalIncome">-</span>
+      </div>
+      <div class="summary-box">
+        <span>รายจ่าย</span><span id="totalExpense">-</span>
+      </div>
+      <div class="summary-box">
+        <span>คงเหลือ</span><span id="balance">-</span>
+      </div>
+    </div>
+    <div class="chart-container">
+      <canvas id="pieChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3>📝 รายการล่าสุด</h3>
+      <table id="latestTable" class="styled-table">
+        <thead>
+          <tr>
+            <th>วันที่</th>
+            <th>ประเภท</th>
+            <th>หมวดหมู่</th>
+            <th>จำนวนเงิน</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p id="lastUpdated"></p>
+  </div>
+<script>
+  async function fetchData() {
+    const sheetID = "1x_2PqzNi6CRgeNF782NIhGTMpE20cggQ94NFyHzT6iw";
+    const gid = "2069202900";
+    const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&gid=${gid}`;
+
+    const response = await fetch(url);
+    const text = await response.text();
+    const json = JSON.parse(text.substring(47).slice(0, -2));
+
+    const rows = json.table.rows;
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+
+    const categoryMap = {};
+
+    rows.forEach(row => {
+      const type = row.c[2]?.v;
+      const amount = parseFloat(row.c[3]?.v || 0);
+      const category = row.c[4]?.v || "ไม่ระบุ";
+
+      if (type === "รายรับ") {
+        totalIncome += amount;
+      } else if (type === "รายจ่าย") {
+        totalExpense += amount;
+        categoryMap[category] = (categoryMap[category] || 0) + amount;
+      }
+    });
+
+    const lastRow = rows[rows.length - 1];
+    const dateCell = lastRow.c[1];
+    const date = dateCell?.f || dateCell?.v || '';
+    document.getElementById("lastUpdated").textContent = `ข้อมูลล่าสุด: ${date}`;
+
+    document.getElementById("totalIncome").textContent = totalIncome.toLocaleString() + " บาท";
+    document.getElementById("totalExpense").textContent = totalExpense.toLocaleString() + " บาท";
+    document.getElementById("balance").textContent = (totalIncome - totalExpense).toLocaleString() + " บาท";
+    drawPieChart(categoryMap);
+    renderLatest(rows);
+  }
+
+  function renderLatest(rows) {
+    // ดึง 5 รายการล่าสุด (จากท้ายสุด)
+    const latest = rows.slice(-5).reverse();
+    const tbody = document.querySelector("#latestTable tbody");
+    tbody.innerHTML = latest.map(row => {
+      const date = row.c[1]?.f || row.c[1]?.v || '';
+      const type = row.c[2]?.v || '';
+      const category = row.c[4]?.v || 'ไม่ระบุ';
+      const amount = parseFloat(row.c[3]?.v || 0).toLocaleString();
+      const typeClass = type === "รายรับ" ? "income" : "expense";
+      return `<tr>
+        <td>${date}</td>
+        <td class="${typeClass}">${type}</td>
+        <td>${category}</td>
+        <td class="${typeClass}" style="text-align:right;">${amount}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function drawPieChart(dataMap) {
+    const ctx = document.getElementById('pieChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: Object.keys(dataMap),
+        datasets: [{
+          data: Object.values(dataMap),
+          backgroundColor: [
+            '#b31217', '#e74c3c', '#f8d7da', '#fff', '#27ae60', '#232526', '#34495e'
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { size: 14 }, color: '#b31217' }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed;
+                return `${context.label}: ${value.toLocaleString()} บาท`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  fetchData();
+</script>
+</body>
+</html>
