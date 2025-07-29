@@ -1,16 +1,19 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dashboard รายรับรายจ่าย</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="apple-touch-icon" href="icon.png">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="apple-touch-icon" href="icon.png" />
   <style>
     body {
       margin: 0;
-      font-family: 'Prompt', sans-serif;
+      font-family: "Prompt", sans-serif;
       background: radial-gradient(circle at top, #270101, #000000);
       color: #fff;
       min-height: 100vh;
@@ -23,7 +26,7 @@
       font-size: 1.6rem;
       font-weight: bold;
       border-radius: 0 0 16px 16px;
-      box-shadow: 0 2px 8px rgba(179,18,23,0.12);
+      box-shadow: 0 2px 8px rgba(179, 18, 23, 0.12);
       letter-spacing: 1px;
     }
     .container {
@@ -41,7 +44,7 @@
       background: #fff;
       border-radius: 10px;
       padding: 1rem 1.2rem;
-      box-shadow: 0 2px 8px rgba(179,18,23,0.07);
+      box-shadow: 0 2px 8px rgba(179, 18, 23, 0.07);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -51,23 +54,29 @@
       transition: box-shadow 0.2s;
     }
     .summary-box:hover {
-      box-shadow: 0 4px 16px rgba(179,18,23,0.13);
+      box-shadow: 0 4px 16px rgba(179, 18, 23, 0.13);
     }
-    .summary-box span:first-child {
-      font-size: 1.1rem;
-      font-weight: 700;
-      letter-spacing: 0.5px;
+    #totalIncome {
+      color: #27ae60;
+      font-weight: bold;
+    }
+    #totalExpense {
+      color: #e74c3c;
+      font-weight: bold;
+    }
+    #balance {
       color: #b31217;
+      font-weight: bold;
     }
-    #totalIncome { color: #27ae60; font-weight: bold; }
-    #totalExpense { color: #e74c3c; font-weight: bold; }
-    #balance { color: #b31217; font-weight: bold; }
     .chart-container {
       background: #fff;
       border-radius: 12px;
-      padding: 1.2rem 0.7rem 1.2rem 0.7rem;
-      box-shadow: 0 2px 8px rgba(179,18,23,0.07);
+      padding: 1.2rem 0.7rem;
+      box-shadow: 0 2px 8px rgba(179, 18, 23, 0.07);
       margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     h3 {
       margin-top: 0;
@@ -83,7 +92,8 @@
       font-size: 1rem;
       background: transparent;
     }
-    .styled-table th, .styled-table td {
+    .styled-table th,
+    .styled-table td {
       padding: 8px 10px;
       border: none;
       text-align: left;
@@ -151,6 +161,17 @@
 <body>
   <header>💸 Dashboard รายรับรายจ่าย</header>
   <div class="container">
+    <div style="text-align:center; margin-bottom:1rem;">
+      <label for="monthSelect">📅 เลือกเดือน: </label>
+      <select
+        id="monthSelect"
+        onchange="filterByMonth(this.value)"
+        style="padding: 0.5rem; border-radius: 6px; font-family: Prompt"
+      >
+        <option value="all">ทั้งหมด</option>
+      </select>
+    </div>
+
     <div class="summary">
       <div class="summary-box">
         <span>รายรับ</span><span id="totalIncome">-</span>
@@ -162,9 +183,11 @@
         <span>คงเหลือ</span><span id="balance">-</span>
       </div>
     </div>
+
     <div class="chart-container">
       <canvas id="pieChart"></canvas>
     </div>
+
     <div class="chart-container">
       <h3>📝 รายการล่าสุด</h3>
       <table id="latestTable" class="styled-table">
@@ -179,103 +202,215 @@
         <tbody></tbody>
       </table>
     </div>
+
     <p id="lastUpdated"></p>
   </div>
-<script>
-  async function fetchData() {
-    const sheetID = "1x_2PqzNi6CRgeNF782NIhGTMpE20cggQ94NFyHzT6iw";
-    const gid = "2069202900";
-    const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&gid=${gid}`;
 
-    const response = await fetch(url);
-    const text = await response.text();
-    const json = JSON.parse(text.substring(47).slice(0, -2));
+  <script>
+    let rawRows = [];
 
-    const rows = json.table.rows;
+    // ฟังก์ชันแปลงวันที่ dd/mm/yyyy เป็น Date object
+    function parseDateThaiFormat(dateStr) {
+      if (!dateStr) return null;
+      const parts = dateStr.split("/");
+      if (parts.length !== 3) return null;
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // เดือนเริ่มจาก 0
+      const year = parseInt(parts[2], 10);
+      return new Date(year, month, day);
+    }
 
-    let totalIncome = 0;
-    let totalExpense = 0;
+    async function fetchData() {
+      const sheetID = "1x_2PqzNi6CRgeNF782NIhGTMpE20cggQ94NFyHzT6iw";
+      const gid = "2069202900";
+      const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&gid=${gid}`;
 
-    const categoryMap = {};
+      const response = await fetch(url);
+      const text = await response.text();
+      const json = JSON.parse(text.substring(47).slice(0, -2));
 
-    rows.forEach(row => {
-      const type = row.c[2]?.v;
-      const amount = parseFloat(row.c[3]?.v || 0);
-      const category = row.c[4]?.v || "ไม่ระบุ";
+      rawRows = json.table.rows;
 
-      if (type === "รายรับ") {
-        totalIncome += amount;
-      } else if (type === "รายจ่าย") {
-        totalExpense += amount;
-        categoryMap[category] = (categoryMap[category] || 0) + amount;
+      populateMonthSelect(rawRows);
+      filterByMonth("all");
+    }
+
+function populateMonthSelect(rows) {
+  const select = document.getElementById("monthSelect");
+  select.innerHTML = ""; // เคลียร์ของเก่า
+
+  const months = new Set();
+
+  const thaiMonths = [
+    "(1) มกราคม",
+    "(2) กุมภาพันธ์",
+    "(3) มีนาคม",
+    "(4) เมษายน",
+    "(5) พฤษภาคม",
+    "(6) มิถุนายน",
+    "(7) กรกฎาคม",
+    "(8) สิงหาคม",
+    "(9) กันยายน",
+    "(10) ตุลาคม",
+    "(11) พฤศจิกายน",
+    "(12) ธันวาคม",
+  ];
+
+  rows.forEach((row) => {
+    const rawDate = row.c[1]?.f || row.c[1]?.v;
+    const date = parseDateThaiFormat(rawDate);
+    if (date && !isNaN(date)) {
+      const year = date.getFullYear();
+      const monthIndex = date.getMonth();
+      const key = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+      months.add(key);
+    }
+  });
+
+  const sortedMonths = Array.from(months).sort().reverse();
+
+  sortedMonths.forEach((m) => {
+    const [y, mo] = m.split("-");
+    const monthName = thaiMonths[parseInt(mo, 10) - 1];
+    const option = document.createElement("option");
+    option.value = m;
+    option.text = `${monthName} ${y}`;
+    select.appendChild(option);
+  });
+
+  // เพิ่ม option "ทั้งหมด" ไว้หลังสุด
+  const optionAll = document.createElement("option");
+  optionAll.value = "all";
+  optionAll.text = "ทั้งหมด";
+  select.appendChild(optionAll);
+
+  // ตั้งค่า default เป็นเดือนล่าสุด (ถ้ามี), ถ้าไม่มีเดือน ให้ default เป็น all
+  if (sortedMonths.length > 0) {
+    select.value = sortedMonths[0];
+    filterByMonth(sortedMonths[0]);
+  } else {
+    select.value = "all";
+    filterByMonth("all");
+  }
+}
+
+
+    function filterByMonth(selectedMonth) {
+      let filtered = rawRows;
+
+      if (selectedMonth !== "all") {
+        filtered = rawRows.filter((row) => {
+          const rawDate = row.c[1]?.f || row.c[1]?.v;
+          const date = parseDateThaiFormat(rawDate);
+          if (!date || isNaN(date)) return false;
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const key = `${year}-${month}`;
+          return key === selectedMonth;
+        });
       }
-    });
 
-    const lastRow = rows[rows.length - 1];
-    const dateCell = lastRow.c[1];
-    const date = dateCell?.f || dateCell?.v || '';
-    document.getElementById("lastUpdated").textContent = `ข้อมูลล่าสุด: ${date}`;
+      let totalIncome = 0;
+      let totalExpense = 0;
+      const categoryMap = {};
 
-    document.getElementById("totalIncome").textContent = totalIncome.toLocaleString() + " บาท";
-    document.getElementById("totalExpense").textContent = totalExpense.toLocaleString() + " บาท";
-    document.getElementById("balance").textContent = (totalIncome - totalExpense).toLocaleString() + " บาท";
-    drawPieChart(categoryMap);
-    renderLatest(rows);
-  }
+      filtered.forEach((row) => {
+        const type = row.c[2]?.v;
+        const amount = parseFloat(row.c[3]?.v || 0);
+        const category = row.c[4]?.v || "ไม่ระบุ";
 
-  function renderLatest(rows) {
-    // ดึง 5 รายการล่าสุด (จากท้ายสุด)
-    const latest = rows.slice(-5).reverse();
-    const tbody = document.querySelector("#latestTable tbody");
-    tbody.innerHTML = latest.map(row => {
-      const date = row.c[1]?.f || row.c[1]?.v || '';
-      const type = row.c[2]?.v || '';
-      const category = row.c[4]?.v || 'ไม่ระบุ';
-      const amount = parseFloat(row.c[3]?.v || 0).toLocaleString();
-      const typeClass = type === "รายรับ" ? "income" : "expense";
-      return `<tr>
-        <td>${date}</td>
-        <td class="${typeClass}">${type}</td>
-        <td>${category}</td>
-        <td class="${typeClass}" style="text-align:right;">${amount}</td>
-      </tr>`;
-    }).join('');
-  }
-
-  function drawPieChart(dataMap) {
-    const ctx = document.getElementById('pieChart').getContext('2d');
-    new Chart(ctx, {
-      type: 'pie',
-      data: {
-        labels: Object.keys(dataMap),
-        datasets: [{
-          data: Object.values(dataMap),
-          backgroundColor: [
-            '#b31217', '#e74c3c', '#f8d7da', '#fff', '#27ae60', '#232526', '#34495e'
-          ]
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { font: { size: 14 }, color: '#b31217' }
-          },
-          tooltip: {
-            callbacks: {
-              label: function(context) {
-                const value = context.parsed;
-                return `${context.label}: ${value.toLocaleString()} บาท`;
-              }
-            }
-          }
+        if (type === "รายรับ") {
+          totalIncome += amount;
+        } else if (type === "รายจ่าย") {
+          totalExpense += amount;
+          categoryMap[category] = (categoryMap[category] || 0) + amount;
         }
-      }
-    });
-  }
+      });
 
-  fetchData();
-</script>
+      document.getElementById("totalIncome").textContent =
+        totalIncome.toLocaleString() + " บาท";
+      document.getElementById("totalExpense").textContent =
+        totalExpense.toLocaleString() + " บาท";
+      document.getElementById("balance").textContent =
+        (totalIncome - totalExpense).toLocaleString() + " บาท";
+
+      drawPieChart(categoryMap);
+      renderLatest(filtered);
+
+      const lastRow = filtered[filtered.length - 1];
+      const dateCell = lastRow?.c[1];
+      const date = dateCell?.f || dateCell?.v || "";
+      document.getElementById(
+        "lastUpdated"
+      ).textContent = `ข้อมูลล่าสุด: ${date}`;
+    }
+
+    function renderLatest(rows) {
+      const latest = rows.slice(-5).reverse();
+      const tbody = document.querySelector("#latestTable tbody");
+      tbody.innerHTML = latest
+        .map((row) => {
+          const date = row.c[1]?.f || row.c[1]?.v || "";
+          const type = row.c[2]?.v || "";
+          const category = row.c[4]?.v || "ไม่ระบุ";
+          const amount = parseFloat(row.c[3]?.v || 0).toLocaleString();
+          const typeClass = type === "รายรับ" ? "income" : "expense";
+          return `<tr>
+            <td>${date}</td>
+            <td class="${typeClass}">${type}</td>
+            <td>${category}</td>
+            <td class="${typeClass}" style="text-align:right;">${amount}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+
+    let pieChartInstance = null;
+    function drawPieChart(dataMap) {
+      const ctx = document.getElementById("pieChart").getContext("2d");
+      if (pieChartInstance) {
+        pieChartInstance.destroy();
+      }
+      pieChartInstance = new Chart(ctx, {
+        type: "pie",
+        data: {
+          labels: Object.keys(dataMap),
+          datasets: [
+            {
+              data: Object.values(dataMap),
+              backgroundColor: [
+                "#b31217",
+                "#e74c3c",
+                "#f8d7da",
+                "#fff",
+                "#27ae60",
+                "#232526",
+                "#34495e",
+              ],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { font: { size: 14 }, color: "#b31217" },
+            },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  const value = context.parsed;
+                  return `${context.label}: ${value.toLocaleString()} บาท`;
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    fetchData();
+  </script>
 </body>
 </html>
