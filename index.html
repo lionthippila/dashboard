@@ -206,54 +206,45 @@
     <p id="lastUpdated"></p>
   </div>
 
-  <script>
-    let rawRows = [];
+  <script>let rawRows = [];
 
-    // ฟังก์ชันแปลงวันที่ dd/mm/yyyy เป็น Date object
-    function parseDateThaiFormat(dateStr) {
-      if (!dateStr) return null;
-      const parts = dateStr.split("/");
-      if (parts.length !== 3) return null;
-      const day = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // เดือนเริ่มจาก 0
-      const year = parseInt(parts[2], 10);
-      return new Date(year, month, day);
-    }
+// แปลงวันที่รูปแบบไทย dd/mm/yyyy เป็น Date
+function parseDateThaiFormat(dateStr) {
+  if (!dateStr) return null;
+  const parts = dateStr.split("/");
+  if (parts.length !== 3) return null;
+  const day = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1; // เดือนเริ่มจาก 0
+  const year = parseInt(parts[2], 10);
+  return new Date(year, month, day);
+}
 
-    async function fetchData() {
-      const sheetID = "1x_2PqzNi6CRgeNF782NIhGTMpE20cggQ94NFyHzT6iw";
-      const gid = "2069202900";
-      const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&gid=${gid}`;
+// โหลดข้อมูลจาก Google Sheets
+async function fetchData() {
+  const sheetID = "1x_2PqzNi6CRgeNF782NIhGTMpE20cggQ94NFyHzT6iw";
+  const gid = "2069202900";
+  const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&gid=${gid}`;
 
-      const response = await fetch(url);
-      const text = await response.text();
-      const json = JSON.parse(text.substring(47).slice(0, -2));
+  const response = await fetch(url);
+  const text = await response.text();
+  const json = JSON.parse(text.substring(47).slice(0, -2));
 
-      rawRows = json.table.rows;
+  rawRows = json.table.rows;
 
-      populateMonthSelect(rawRows);
-      filterByMonth("all");
-    }
+  populateMonthSelect(rawRows);
+  filterByMonth("auto"); // auto = ให้เลือกเดือนล่าสุดโดยอัตโนมัติ
+}
 
+// เติม dropdown เดือน + เลือกเดือนล่าสุดอัตโนมัติ
 function populateMonthSelect(rows) {
   const select = document.getElementById("monthSelect");
-  select.innerHTML = ""; // เคลียร์ของเก่า
+  select.innerHTML = "";
 
   const months = new Set();
-
   const thaiMonths = [
-    "(1) มกราคม",
-    "(2) กุมภาพันธ์",
-    "(3) มีนาคม",
-    "(4) เมษายน",
-    "(5) พฤษภาคม",
-    "(6) มิถุนายน",
-    "(7) กรกฎาคม",
-    "(8) สิงหาคม",
-    "(9) กันยายน",
-    "(10) ตุลาคม",
-    "(11) พฤศจิกายน",
-    "(12) ธันวาคม",
+    "(1) มกราคม", "(2) กุมภาพันธ์", "(3) มีนาคม", "(4) เมษายน",
+    "(5) พฤษภาคม", "(6) มิถุนายน", "(7) กรกฎาคม", "(8) สิงหาคม",
+    "(9) กันยายน", "(10) ตุลาคม", "(11) พฤศจิกายน", "(12) ธันวาคม"
   ];
 
   rows.forEach((row) => {
@@ -278,142 +269,141 @@ function populateMonthSelect(rows) {
     select.appendChild(option);
   });
 
-  // เพิ่ม option "ทั้งหมด" ไว้หลังสุด
   const optionAll = document.createElement("option");
   optionAll.value = "all";
   optionAll.text = "ทั้งหมด";
   select.appendChild(optionAll);
 
-  // ตั้งค่า default เป็นเดือนล่าสุด (ถ้ามี), ถ้าไม่มีเดือน ให้ default เป็น all
+  // ตั้งค่า default เป็นเดือนล่าสุด
   if (sortedMonths.length > 0) {
     select.value = sortedMonths[0];
-    filterByMonth(sortedMonths[0]);
   } else {
     select.value = "all";
-    filterByMonth("all");
   }
 }
 
+// ฟิลเตอร์ข้อมูลตามเดือน
+function filterByMonth(selectedMonth) {
+  const select = document.getElementById("monthSelect");
 
-    function filterByMonth(selectedMonth) {
-      let filtered = rawRows;
+  // ถ้าเลือก "auto" → ใช้ค่าจาก dropdown (เดือนล่าสุด)
+  if (selectedMonth === "auto") {
+    selectedMonth = select.value;
+  }
 
-      if (selectedMonth !== "all") {
-        filtered = rawRows.filter((row) => {
-          const rawDate = row.c[1]?.f || row.c[1]?.v;
-          const date = parseDateThaiFormat(rawDate);
-          if (!date || isNaN(date)) return false;
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const key = `${year}-${month}`;
-          return key === selectedMonth;
-        });
-      }
+  let filtered = rawRows;
+  if (selectedMonth !== "all") {
+    filtered = rawRows.filter((row) => {
+      const rawDate = row.c[1]?.f || row.c[1]?.v;
+      const date = parseDateThaiFormat(rawDate);
+      if (!date || isNaN(date)) return false;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const key = `${year}-${month}`;
+      return key === selectedMonth;
+    });
+  }
 
-      let totalIncome = 0;
-      let totalExpense = 0;
-      const categoryMap = {};
+  let totalIncome = 0;
+  let totalExpense = 0;
+  const categoryMap = {};
 
-      filtered.forEach((row) => {
-        const type = row.c[2]?.v;
-        const amount = parseFloat(row.c[3]?.v || 0);
-        const category = row.c[4]?.v || "ไม่ระบุ";
+  filtered.forEach((row) => {
+    const type = row.c[2]?.v;
+    const amount = parseFloat(row.c[3]?.v || 0);
+    const category = row.c[4]?.v || "ไม่ระบุ";
 
-        if (type === "รายรับ") {
-          totalIncome += amount;
-        } else if (type === "รายจ่าย") {
-          totalExpense += amount;
-          categoryMap[category] = (categoryMap[category] || 0) + amount;
-        }
-      });
-
-      document.getElementById("totalIncome").textContent =
-        totalIncome.toLocaleString() + " บาท";
-      document.getElementById("totalExpense").textContent =
-        totalExpense.toLocaleString() + " บาท";
-      document.getElementById("balance").textContent =
-        (totalIncome - totalExpense).toLocaleString() + " บาท";
-
-      drawPieChart(categoryMap);
-      renderLatest(filtered);
-
-      const lastRow = filtered[filtered.length - 1];
-      const dateCell = lastRow?.c[1];
-      const date = dateCell?.f || dateCell?.v || "";
-      document.getElementById(
-        "lastUpdated"
-      ).textContent = `ข้อมูลล่าสุด: ${date}`;
+    if (type === "รายรับ") {
+      totalIncome += amount;
+    } else if (type === "รายจ่าย") {
+      totalExpense += amount;
+      categoryMap[category] = (categoryMap[category] || 0) + amount;
     }
+  });
 
-    function renderLatest(rows) {
-      const latest = rows.slice(-5).reverse();
-      const tbody = document.querySelector("#latestTable tbody");
-      tbody.innerHTML = latest
-        .map((row) => {
-          const date = row.c[1]?.f || row.c[1]?.v || "";
-          const type = row.c[2]?.v || "";
-          const category = row.c[4]?.v || "ไม่ระบุ";
-          const amount = parseFloat(row.c[3]?.v || 0).toLocaleString();
-          const typeClass = type === "รายรับ" ? "income" : "expense";
-          return `<tr>
-            <td>${date}</td>
-            <td class="${typeClass}">${type}</td>
-            <td>${category}</td>
-            <td class="${typeClass}" style="text-align:right;">${amount}</td>
-          </tr>`;
-        })
-        .join("");
-    }
+  document.getElementById("totalIncome").textContent =
+    totalIncome.toLocaleString() + " บาท";
+  document.getElementById("totalExpense").textContent =
+    totalExpense.toLocaleString() + " บาท";
+  document.getElementById("balance").textContent =
+    (totalIncome - totalExpense).toLocaleString() + " บาท";
 
-    let pieChartInstance = null;
-    function drawPieChart(dataMap) {
-      const ctx = document.getElementById("pieChart").getContext("2d");
-      if (pieChartInstance) {
-        pieChartInstance.destroy();
-      }
-      pieChartInstance = new Chart(ctx, {
-        type: "pie",
-        data: {
-          labels: Object.keys(dataMap),
-          datasets: [
-            {
-              data: Object.values(dataMap),
-                backgroundColor: [
-                "#d32f2f",
-                "#f57c00",
-                "#388e3c",
-                "#1976d2",
-                "#7b1fa2",
-                "#fbc02d",
-                "#c2185b",
-                "#455a64",
-                "#212121",
-                "#0288d1"
-                ],
-            },
-          ],
+  drawPieChart(categoryMap);
+  renderLatest(filtered);
+
+  const lastRow = filtered[filtered.length - 1];
+  const dateCell = lastRow?.c[1];
+  const date = dateCell?.f || dateCell?.v || "";
+  document.getElementById("lastUpdated").textContent = `ข้อมูลล่าสุด: ${date}`;
+}
+
+// แสดงตารางรายการล่าสุด
+function renderLatest(rows) {
+  const latest = rows.slice(-5).reverse();
+  const tbody = document.querySelector("#latestTable tbody");
+  tbody.innerHTML = latest
+    .map((row) => {
+      const date = row.c[1]?.f || row.c[1]?.v || "";
+      const type = row.c[2]?.v || "";
+      const category = row.c[4]?.v || "ไม่ระบุ";
+      const amount = parseFloat(row.c[3]?.v || 0).toLocaleString();
+      const typeClass = type === "รายรับ" ? "income" : "expense";
+      return `<tr>
+        <td>${date}</td>
+        <td class="${typeClass}">${type}</td>
+        <td>${category}</td>
+        <td class="${typeClass}" style="text-align:right;">${amount}</td>
+      </tr>`;
+    })
+    .join("");
+}
+
+// วาด Pie Chart
+let pieChartInstance = null;
+function drawPieChart(dataMap) {
+  const ctx = document.getElementById("pieChart").getContext("2d");
+  if (pieChartInstance) {
+    pieChartInstance.destroy();
+  }
+  pieChartInstance = new Chart(ctx, {
+    type: "pie",
+    data: {
+      labels: Object.keys(dataMap),
+      datasets: [{
+        data: Object.values(dataMap),
+        backgroundColor: [
+          "#d32f2f", "#f57c00", "#388e3c", "#1976d2", "#7b1fa2",
+          "#fbc02d", "#c2185b", "#455a64", "#212121", "#0288d1"
+        ],
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { font: { size: 14 }, color: "#b31217" },
         },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: {
-              position: "bottom",
-              labels: { font: { size: 14 }, color: "#b31217" },
-            },
-            tooltip: {
-              callbacks: {
-                label: function (context) {
-                  const value = context.parsed;
-                  return `${context.label}: ${value.toLocaleString()} บาท`;
-                },
-              },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              const value = context.parsed;
+              return `${context.label}: ${value.toLocaleString()} บาท`;
             },
           },
         },
-      });
-    }
+      },
+    },
+  });
+}
 
-    fetchData();
+// โหลดข้อมูลเมื่อเปิดเว็บ
+fetchData();
+
+// เปลี่ยนเดือนจาก dropdown
+document.getElementById("monthSelect").addEventListener("change", function () {
+  filterByMonth(this.value);
+});
   </script>
 </body>
 </html>
